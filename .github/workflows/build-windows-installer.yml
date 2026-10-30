@@ -1,0 +1,40 @@
+
+name: Build The Spark and the Woven Person Windows App
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    name: Build Windows installer and portable app
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out project
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build Windows applications
+        run: npm run dist:win
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload Windows executables
+        uses: actions/upload-artifact@v7
+        with:
+          name: The-Spark-and-the-Woven-Person-Windows-Installers
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 30
