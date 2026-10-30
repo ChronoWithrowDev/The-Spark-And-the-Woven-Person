@@ -23,11 +23,49 @@ jobs:
         with:
           node-version: 22
 
+      - name: Find game project folder
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Path $env:GITHUB_WORKSPACE -Filter package.json -Recurse -File |
+            Where-Object {
+              $_.FullName -notmatch '[\\/](node_modules|\.git)[\\/]'
+            }
+
+          $game = $null
+
+          foreach ($file in $files) {
+            try {
+              $pkg = Get-Content $file.FullName -Raw | ConvertFrom-Json
+
+              if ($pkg.scripts -and $pkg.scripts.'dist:win') {
+                $game = $file.DirectoryName
+                break
+              }
+            } catch {}
+          }
+
+          if (-not $game) {
+            throw "Could not find package.json containing the dist:win script."
+          }
+
+          "GAME_DIR=$game" |
+            Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+          Write-Host "Found project: $game"
+
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        shell: pwsh
+        run: |
+          Set-Location $env:GAME_DIR
+          npm install --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build Windows applications
-        run: npm run dist:win
+        shell: pwsh
+        run: |
+          Set-Location $env:GAME_DIR
+          npm run dist:win
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
@@ -35,6 +73,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: The-Spark-and-the-Woven-Person-Windows-Installers
-          path: release/*.exe
+          path: '**/release/*.exe'
           if-no-files-found: error
           retention-days: 30
